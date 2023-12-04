@@ -87,13 +87,21 @@ def prediction():
         image_gcs_path = data.get('image_path', None)
 
         if image_gcs_path:
-            # Read image from GCS
+            # Check if the file exists in the bucket
             blob = client.bucket(bucket_name).blob(image_gcs_path.split('/')[-1])
+            if not blob.exists():
+                return jsonify({
+                    "status": {
+                        "code": 404,
+                        "message": "File not found in bucket"
+                    },
+                    "data": None
+                }), 404
             temp_dir = tempfile.mkdtemp()
             temp_image = os.path.join(temp_dir, image_gcs_path.split('/')[-1])
             blob.download_to_filename(temp_image)
 
-                # Preprocess image for TensorFlow Lite
+            # Preprocess image for TensorFlow Lite
             img = Image.open(temp_image).convert("RGB")
             img = img.resize((width, height))
             img = np.expand_dims(img, axis=0)
@@ -114,17 +122,18 @@ def prediction():
                     detections.append(object_name)
 
             detections_dict = dict(Counter(detections))
-            
+
+            # Format predictions
             formatted_predictions = []
             idx = 1
             for name, count in detections_dict.items():
                 formatted_prediction = {
-            "id": str(idx),
-            "nama": name,
-            "jumlah": str(count)
-            }
-            formatted_predictions.append(formatted_prediction)
-            idx += 1
+                    "id": str(idx),
+                    "nama": name,
+                    "jumlah": str(count)
+                }
+                formatted_predictions.append(formatted_prediction)
+                idx += 1
 
             # Clean up temporary directory and its contents
             if os.path.exists(temp_dir):
@@ -156,6 +165,7 @@ def prediction():
             },
             "data": None,
         }), 405
+
 
 
 if __name__ == "__main__":
